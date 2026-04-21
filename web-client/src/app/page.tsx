@@ -1,65 +1,321 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useCallback } from "react";
+import {
+  Activity,
+  Brain,
+  Shield,
+  Timer,
+  Mic,
+  BarChart3,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  Clock,
+} from "lucide-react";
+import { MetricCard } from "@/components/ui/metric-card";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { useApi } from "@/hooks/use-api";
+import * as api from "@/lib/api-client";
+import type { InteractionRecord, TrendDataPoint } from "@/lib/types/evaluation";
+
+export default function DashboardPage() {
+  const { data: dashboardData, loading: dashLoading } = useApi({
+    fetcher: useCallback(() => api.metrics.dashboard(24), []),
+    pollInterval: 15000,
+  });
+
+  const { data: trendData } = useApi({
+    fetcher: useCallback(() => api.metrics.trends(168), []),
+    pollInterval: 60000,
+  });
+
+  const { data: recentInteractions } = useApi({
+    fetcher: useCallback(() => api.interactions.list({ limit: 8 }), []),
+    pollInterval: 10000,
+  });
+
+  const { data: coreHealth } = useApi({
+    fetcher: useCallback(() => api.health.core(), []),
+    pollInterval: 30000,
+  });
+
+  const { data: infraHealth } = useApi({
+    fetcher: useCallback(() => api.health.infra(), []),
+    pollInterval: 30000,
+  });
+
+  const d = dashboardData;
+  const trends = trendData?.trends ?? [];
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">
+            Command Center
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-sm text-[var(--text-secondary)] mt-1">
+            Quality Orchestration Overview — Live Metrics
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <div className="flex items-center gap-3">
+          <StatusBadge
+            status={coreHealth?.status === "healthy" ? "operational" : "degraded"}
+            label="Core Intelligence"
+          />
+          <StatusBadge
+            status={infraHealth?.status === "healthy" ? "operational" : "degraded"}
+            label="Platform Infra"
+          />
         </div>
-      </main>
+      </div>
+
+      {/* KPI Metric Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <MetricCard
+          title="Resolution Rate"
+          value={d ? Math.round(d.resolution_rate * 100) : 0}
+          unit="%"
+          status={
+            d
+              ? d.resolution_rate >= 0.8
+                ? "healthy"
+                : d.resolution_rate >= 0.6
+                ? "warning"
+                : "critical"
+              : "neutral"
+          }
+          trend="up"
+          trendValue="Target: 80%"
+          icon={<Brain className="w-4 h-4" />}
+        />
+        <MetricCard
+          title="Accuracy"
+          value={d ? (d.avg_accuracy * 100).toFixed(1) : "0"}
+          unit="%"
+          status={
+            d
+              ? d.avg_accuracy >= 0.98
+                ? "healthy"
+                : d.avg_accuracy >= 0.9
+                ? "warning"
+                : "critical"
+              : "neutral"
+          }
+          trend="up"
+          trendValue="Target: 98%"
+          icon={<Shield className="w-4 h-4" />}
+        />
+        <MetricCard
+          title="Hallucination Index"
+          value={d ? (d.hallucination_rate * 100).toFixed(2) : "0"}
+          unit="%"
+          status={
+            d
+              ? d.hallucination_rate <= 0.02
+                ? "healthy"
+                : d.hallucination_rate <= 0.05
+                ? "warning"
+                : "critical"
+              : "neutral"
+          }
+          trend="down"
+          trendValue="Target: ~0%"
+          icon={<AlertTriangle className="w-4 h-4" />}
+        />
+        <MetricCard
+          title="Avg Latency"
+          value={d ? Math.round(d.avg_latency_ms) : 0}
+          unit="ms"
+          status={
+            d
+              ? d.avg_latency_ms <= 300
+                ? "healthy"
+                : d.avg_latency_ms <= 500
+                ? "warning"
+                : "critical"
+              : "neutral"
+          }
+          trend="down"
+          trendValue="Target: <300ms"
+          icon={<Timer className="w-4 h-4" />}
+        />
+        <MetricCard
+          title="JRH Agreement"
+          value={d?.avg_jrh_score ? (d.avg_jrh_score * 100).toFixed(1) : "N/A"}
+          unit={d?.avg_jrh_score ? "%" : ""}
+          status={
+            d?.avg_jrh_score
+              ? d.avg_jrh_score >= 0.85
+                ? "healthy"
+                : "warning"
+              : "neutral"
+          }
+          icon={<BarChart3 className="w-4 h-4" />}
+        />
+        <MetricCard
+          title="Total Interactions"
+          value={d?.total_interactions ?? 0}
+          status="neutral"
+          trend="up"
+          icon={<Activity className="w-4 h-4" />}
+        />
+      </div>
+
+      {/* Trend Visualization + Recent Interactions */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Trend Chart */}
+        <div className="xl:col-span-2 glass-card-static p-6">
+          <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
+            <Activity className="w-4 h-4 text-[var(--cyan)]" />
+            7-Day Trend
+          </h2>
+
+          {trends.length > 0 ? (
+            <div className="space-y-4">
+              {/* Accuracy trend bars */}
+              <div>
+                <p className="text-xs text-[var(--text-muted)] mb-2 uppercase tracking-wider">
+                  Accuracy per Day
+                </p>
+                <div className="flex items-end gap-2 h-24">
+                  {trends.map((t: TrendDataPoint, i: number) => {
+                    const pct = t.avg_accuracy * 100;
+                    const color =
+                      pct >= 98
+                        ? "bg-[var(--green)]"
+                        : pct >= 90
+                        ? "bg-[var(--amber)]"
+                        : "bg-[var(--red)]";
+                    return (
+                      <div
+                        key={i}
+                        className="flex-1 flex flex-col items-center gap-1"
+                      >
+                        <span className="text-[10px] text-[var(--text-muted)] font-mono">
+                          {pct.toFixed(0)}%
+                        </span>
+                        <div
+                          className={`w-full rounded-t-sm ${color} transition-all duration-500`}
+                          style={{
+                            height: `${Math.max(pct * 0.9, 4)}%`,
+                            opacity: 0.85,
+                          }}
+                        />
+                        <span className="text-[9px] text-[var(--text-muted)]">
+                          {t.date.slice(5)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Latency trend bars */}
+              <div>
+                <p className="text-xs text-[var(--text-muted)] mb-2 uppercase tracking-wider">
+                  Avg Latency (ms)
+                </p>
+                <div className="flex items-end gap-2 h-20">
+                  {trends.map((t: TrendDataPoint, i: number) => {
+                    const maxLat = Math.max(
+                      ...trends.map((x: TrendDataPoint) => x.avg_latency_ms),
+                      1
+                    );
+                    const pct = (t.avg_latency_ms / maxLat) * 100;
+                    const color =
+                      t.avg_latency_ms <= 300
+                        ? "bg-[var(--cyan)]"
+                        : t.avg_latency_ms <= 500
+                        ? "bg-[var(--amber)]"
+                        : "bg-[var(--red)]";
+                    return (
+                      <div
+                        key={i}
+                        className="flex-1 flex flex-col items-center gap-1"
+                      >
+                        <span className="text-[10px] text-[var(--text-muted)] font-mono">
+                          {Math.round(t.avg_latency_ms)}
+                        </span>
+                        <div
+                          className={`w-full rounded-t-sm ${color} transition-all duration-500`}
+                          style={{
+                            height: `${Math.max(pct * 0.85, 4)}%`,
+                            opacity: 0.75,
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-40 text-[var(--text-muted)] text-sm">
+              {dashLoading ? (
+                <div className="shimmer w-full h-full rounded-lg" />
+              ) : (
+                "No trend data available yet. Ingest interactions to see trends."
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Recent Interactions */}
+        <div className="glass-card-static p-6 max-h-[480px] overflow-y-auto">
+          <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
+            <Clock className="w-4 h-4 text-[var(--violet)]" />
+            Recent Interactions
+          </h2>
+
+          {recentInteractions && recentInteractions.length > 0 ? (
+            <div className="space-y-3">
+              {recentInteractions.map((item: InteractionRecord) => (
+                <div
+                  key={item.id}
+                  className="p-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-active)] transition-all cursor-pointer"
+                >
+                  <div className="flex items-start justify-between mb-1.5">
+                    <p className="text-xs font-medium text-[var(--text-primary)] line-clamp-1 flex-1 mr-2">
+                      {item.query}
+                    </p>
+                    {item.autonomous_resolution ? (
+                      <CheckCircle className="w-3.5 h-3.5 text-[var(--green)] flex-shrink-0" />
+                    ) : (
+                      <XCircle className="w-3.5 h-3.5 text-[var(--amber)] flex-shrink-0" />
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 text-[10px] text-[var(--text-muted)]">
+                    <span className="font-mono">
+                      {(item.accuracy_score * 100).toFixed(1)}% acc
+                    </span>
+                    <span className="font-mono">
+                      {Math.round(item.total_latency_ms)}ms
+                    </span>
+                    {item.hallucination_flag && (
+                      <span className="text-[var(--red)] font-semibold">
+                        HALLUCINATION
+                      </span>
+                    )}
+                    {item.jrh_composite_score !== null &&
+                      item.jrh_composite_score !== undefined && (
+                        <span className="font-mono">
+                          JRH: {(item.jrh_composite_score * 100).toFixed(0)}%
+                        </span>
+                      )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-[var(--text-muted)] text-center py-8">
+              No interactions recorded yet.
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
