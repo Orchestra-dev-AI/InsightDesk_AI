@@ -11,8 +11,7 @@ import logging
 import os
 from typing import Any, Dict, List, Optional
 
-from google import genai
-from google.genai import types as genai_types
+import httpx
 from groq import Groq
 
 from schemas.reasoning import ActionType, ThoughtStep
@@ -24,17 +23,11 @@ class MultiProviderRouter:
     """Routes inference requests to the configured LLM provider."""
 
     def __init__(self):
-        self.provider = os.getenv("PRIMARY_LLM_PROVIDER", "gemini").lower()
-        self.gemini_client = None
+        self.provider = os.getenv("PRIMARY_LLM_PROVIDER", "groq").lower()
         self.groq_client = None
+        self.nvidia_api_key = None
 
-        if self.provider == "gemini":
-            api_key = os.getenv("GEMINI_API_KEY")
-            if not api_key or api_key == "your-gemini-api-key-here":
-                logger.warning("GEMINI_API_KEY not set. Engine will operate in mock mode.")
-            else:
-                self.gemini_client = genai.Client(api_key=api_key)
-        elif self.provider == "groq":
+        if self.provider == "groq":
             api_key = os.getenv("GROQ_API_KEY")
             if not api_key or api_key == "your-groq-api-key-here":
                 logger.warning("GROQ_API_KEY not set. Engine will operate in mock mode.")
@@ -42,6 +35,9 @@ class MultiProviderRouter:
                 self.groq_client = Groq(api_key=api_key)
         else:
             logger.warning(f"Unknown provider '{self.provider}'. Falling back to mock mode.")
+
+        # Setup secondary fallback (Nvidia)
+        self.nvidia_api_key = os.getenv("NVIDIA_API_KEY")
 
     async def generate_thought(
         self,
@@ -54,76 +50,60 @@ class MultiProviderRouter:
     ) -> ThoughtStep:
         """
         Calls the active LLM provider to generate the next ThoughtStep.
-        If no API key is configured, falls back to the deterministic router.
+        If the primary provider (Groq) fails, seamlessly falls back to Nvidia.
         """
-        # Try the configured LLM provider; fall back to mock on ANY failure
-        # (revoked key, network error, rate limit, etc.)
-        if self.provider == "gemini" and self.gemini_client:
-            result = await self._call_gemini(system_prompt, user_context, tools, step_idx)
-            if result.confidence > 0.0:  # LLM call succeeded
-                return result
-            logger.warning("Gemini call failed — falling back to mock mode")
-        elif self.provider == "groq" and self.groq_client:
+        if self.provider == "groq" and self.groq_client:
             result = await self._call_groq(system_prompt, user_context, tools, step_idx)
             if result.confidence > 0.0:  # LLM call succeeded
                 return result
-            logger.warning("Groq call failed — falling back to mock mode")
+            
+            logger.warning("Groq call failed — seamlessly falling back to Nvidia")
+            if self.nvidia_api_key:
+                nvidia_result = await self._call_nvidia(system_prompt, user_context, tools, step_idx)
+                if nvidia_result.confidence > 0.0:
+                    return nvidia_result
+            logger.warning("Nvidia fallback failed — falling back to mock mode")
         
         # Fallback to deterministic routing (Mock mode)
         logger.info("Using mock deterministic router for step %d", step_idx)
         return mock_fallback(step_idx, tools)
 
-    async def _call_gemini(self, system_prompt: str, user_context: str, tools: List[str], step_idx: int) -> ThoughtStep:
-        """Execute inference using Gemini 2.0 Flash with Structured Outputs."""
-        model_name = "gemini-2.5-flash"
+    async def _call_nvidia(self, system_prompt: str, user_context: str, tools: List[str], step_idx: int) -> ThoughtStep:
+        """Execute inference using NVIDIA NIM (Llama 3.1 70B) with JSON mode as fallback."""
+        model_name = "meta/llama-3.1-70b-instruct"
+        base_url = "https://integrate.api.nvidia.com/v1/chat/completions"
         
-        # Define the expected JSON schema for ThoughtStep
-        thought_schema = {
-            "type": "OBJECT",
-            "properties": {
-                "thinking": {"type": "STRING"},
-                "action_type": {"type": "STRING", "enum": ["tool_call", "memory_update", "response", "self_correct"]},
-                "action_input": {"type": "OBJECT"},
-                "confidence": {"type": "NUMBER"}
-            },
-            "required": ["thinking", "action_type", "action_input", "confidence"]
-        }
-
         try:
-            # We use synchronous call here for simplicity, but in production we'd use async
-            # Since google-genai supports async via client.aio, let's use it if available, 
-            # otherwise wrap in run_in_executor
-            import asyncio
-            loop = asyncio.get_event_loop()
-            
-            def _sync_call():
-                return self.gemini_client.models.generate_content(
-                    model=model_name,
-                    contents=user_context,
-                    config=genai_types.GenerateContentConfig(
-                        system_instruction=system_prompt,
-                        response_mime_type="application/json",
-                        response_schema=thought_schema,
-                        temperature=0.2,
-                    )
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(
+                    base_url,
+                    headers={"Authorization": f"Bearer {self.nvidia_api_key}"},
+                    json={
+                        "model": model_name,
+                        "messages": [
+                            {"role": "system", "content": system_prompt + "\n\nRespond ONLY with a valid JSON object matching the ThoughtStep schema."},
+                            {"role": "user", "content": user_context}
+                        ],
+                        "temperature": 0.2,
+                        "response_format": {"type": "json_object"},
+                    },
                 )
-            
-            response = await loop.run_in_executor(None, _sync_call)
-            
-            data = json.loads(response.text)
+                resp.raise_for_status()
+                data = json.loads(resp.json()["choices"][0]["message"]["content"])
+                
             return ThoughtStep(
                 step_index=step_idx,
-                thinking=data.get("thinking", "No reasoning provided"),
+                thinking=data.get("thinking", "No reasoning provided (Nvidia fallback)"),
                 action_type=ActionType(data.get("action_type", "response")),
                 action_input=data.get("action_input", {}),
                 confidence=float(data.get("confidence", 0.8))
             )
             
         except Exception as e:
-            logger.error(f"Gemini API error: {e}")
+            logger.error(f"Nvidia API error: {e}")
             return ThoughtStep(
                 step_index=step_idx,
-                thinking=f"Error calling LLM: {e}",
+                thinking=f"Error calling Nvidia LLM: {e}",
                 action_type=ActionType.RESPONSE,
                 action_input={"answer": "I encountered an internal error while processing your request."},
                 confidence=0.0

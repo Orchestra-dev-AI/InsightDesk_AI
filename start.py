@@ -132,11 +132,10 @@ def validate_keys(root_dir):
     infra_env = parse_env(root_dir / "platform-infra" / ".env")
     
     keys_to_test = [
-        ("Gemini (Core)", "gemini", core_env.get("GEMINI_API_KEY")),
         ("Groq (Core)", "groq", core_env.get("GROQ_API_KEY")),
+        ("NVIDIA (Core)", "nvidia", core_env.get("NVIDIA_API_KEY")),
         ("NVIDIA (Infra Judge)", "nvidia", infra_env.get("INFRA_JUDGE_NVIDIA_API_KEY")),
         ("Groq (Infra Judge)", "groq", infra_env.get("INFRA_JUDGE_GROQ_API_KEY")),
-        ("Gemini (Infra Judge)", "gemini", infra_env.get("INFRA_JUDGE_GEMINI_API_KEY")),
     ]
 
     all_good = True

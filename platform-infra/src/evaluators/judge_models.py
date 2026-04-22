@@ -10,7 +10,6 @@
 # Providers:
 #   • NVIDIA NIM (Llama 3.1 70B)
 #   • Groq       (Llama 3 70B)
-#   • Google     (Gemini 2.0 Flash)
 # ──────────────────────────────────────────────────────────────────────────────
 
 from __future__ import annotations
@@ -300,52 +299,8 @@ class GroqJudge(BaseJudge):
             return resp.json()["choices"][0]["message"]["content"]
 
 
-# ── Gemini Judge ────────────────────────────────────────────────────────────
-
-class GeminiJudge(BaseJudge):
-    """Judge powered by Google (Gemini 2.0 Flash)."""
-
-    provider = "gemini"
-
-    def __init__(self) -> None:
-        self.model = settings.JUDGE_GEMINI_MODEL
-        self._api_key = settings.JUDGE_GEMINI_API_KEY
-        self._base_url = settings.JUDGE_GEMINI_BASE_URL
-
-    async def _call_model(self, system_prompt: str, user_prompt: str) -> str:
-        if not self._api_key:
-            return json.dumps({
-                "reasoning": "Gemini API key not configured — returning mock score.",
-                "coherence": 7, "consistency": 8, "fluency": 7, "relevance": 7,
-                "overall_score": 7.25, "confidence": 0.3,
-            })
-
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.post(
-                f"{self._base_url}/models/{self.model}:generateContent",
-                params={"key": self._api_key},
-                json={
-                    "system_instruction": {"parts": [{"text": system_prompt}]},
-                    "contents": [
-                        {"parts": [{"text": user_prompt}]},
-                    ],
-                    "generationConfig": {
-                        "temperature": 0.1,
-                        "responseMimeType": "application/json",
-                    },
-                },
-            )
-            resp.raise_for_status()
-            candidates = resp.json().get("candidates", [])
-            if candidates:
-                parts = candidates[0].get("content", {}).get("parts", [])
-                if parts:
-                    return parts[0].get("text", "{}")
-            return "{}"
-
-
 # ── Factory ─────────────────────────────────────────────────────────────────
 
 def create_default_judges() -> List[BaseJudge]:
-    """Instantiate the default 3-judge panel (one per provider)."""
-    return [NvidiaJudge(), GroqJudge(), GeminiJudge()]
+    """Instantiate the default 2-judge panel (one per provider)."""
+    return [NvidiaJudge(), GroqJudge()]

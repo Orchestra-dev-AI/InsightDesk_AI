@@ -41,10 +41,6 @@ class Settings(BaseSettings):
     JUDGE_GROQ_MODEL: str = "llama3-70b-8192"
     JUDGE_GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
 
-    JUDGE_GEMINI_API_KEY: Optional[str] = None
-    JUDGE_GEMINI_MODEL: str = "gemini-2.0-flash"
-    JUDGE_GEMINI_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta"
-
     # ── JRH Thresholds ──────────────────────────────────────────────────────
     JRH_ENTROPY_THRESHOLD: float = Field(
         default=0.7,
