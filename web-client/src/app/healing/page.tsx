@@ -37,7 +37,7 @@ export default function HealingPage() {
           </p>
         </div>
         <StatusBadge
-          status={healthPct >= 80 ? "operational" : healthPct >= 50 ? "degraded" : "offline"}
+          status={totalCount === 0 ? "operational" : healthPct >= 80 ? "operational" : healthPct >= 50 ? "degraded" : "offline"}
           label="Healing Engine"
         />
       </div>

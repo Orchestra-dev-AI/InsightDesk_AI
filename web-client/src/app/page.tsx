@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import {
   Activity,
   Brain,
@@ -12,6 +12,7 @@ import {
   CheckCircle,
   XCircle,
   Clock,
+  Trash2,
 } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -21,17 +22,17 @@ import * as api from "@/lib/api-client";
 import type { InteractionRecord, TrendDataPoint } from "@/lib/types/evaluation";
 
 export default function DashboardPage() {
-  const { data: dashboardData, loading: dashLoading } = useApi({
+  const { data: dashboardData, loading: dashLoading, refetch: refetchDashboard } = useApi({
     fetcher: useCallback(() => api.metrics.dashboard(24), []),
     pollInterval: 15000,
   });
 
-  const { data: trendData } = useApi({
+  const { data: trendData, refetch: refetchTrends } = useApi({
     fetcher: useCallback(() => api.metrics.trends(168), []),
     pollInterval: 60000,
   });
 
-  const { data: recentInteractions } = useApi({
+  const { data: recentInteractions, refetch: refetchInteractions } = useApi({
     fetcher: useCallback(() => api.interactions.list({ limit: 8 }), []),
     pollInterval: 10000,
   });
@@ -45,6 +46,28 @@ export default function DashboardPage() {
     fetcher: useCallback(() => api.health.infra(), []),
     pollInterval: 30000,
   });
+
+  const handleResetData = async () => {
+    try {
+      await api.interactions.deleteAll();
+      refetchDashboard();
+      refetchTrends();
+      refetchInteractions();
+    } catch (e) {
+      console.error("Failed to reset data", e);
+    }
+  };
+
+  // Listen for refresh events
+  useEffect(() => {
+    const handleRefresh = () => {
+      refetchDashboard();
+      refetchTrends();
+      refetchInteractions();
+    };
+    window.addEventListener("refreshDashboardData", handleRefresh);
+    return () => window.removeEventListener("refreshDashboardData", handleRefresh);
+  }, [refetchDashboard, refetchTrends, refetchInteractions]);
 
   const d = dashboardData;
   const trends = trendData?.trends ?? [];
@@ -62,6 +85,13 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={handleResetData}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--red)] text-[var(--red)] text-xs font-semibold hover:bg-[var(--red-glow)] transition-colors mr-2"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Reset DB
+          </button>
           <StatusBadge
             status={coreHealth?.status === "healthy" ? "operational" : "degraded"}
             label="Core Intelligence"

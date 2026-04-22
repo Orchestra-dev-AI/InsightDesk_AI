@@ -134,7 +134,7 @@ export default function VoicePage() {
       : status === SessionStatus.ERROR
       ? "offline"
       : status === SessionStatus.DISCONNECTED
-      ? "offline"
+      ? "operational" // Ready to connect, not broken
       : "degraded";
 
   return (

@@ -26,15 +26,15 @@ export function LiveSandbox() {
       const response = await api.reasoning.resolve(query);
       setResult(response);
 
-      // 2. Trigger Supervisor Audit
-      const auditResult = await api.evaluate.jrhDirect({
-        query: query,
-        thought_chain: response.steps,
-        final_resolution: response.final_resolution || "",
-        tool_calls: response.tool_calls,
-        generator_provider: response.generator_provider
-      });
+      // 2. Ingest into the Interaction Repository (saves to DB)
+      await api.interactions.ingest(response);
+
+      // 3. Trigger Supervisor Audit on the stored session
+      const auditResult = await api.evaluate.jrh(response.session_id);
       setAudit(auditResult);
+
+      // 4. Notify other components to refresh dashboard data
+      window.dispatchEvent(new Event('refreshDashboardData'));
 
     } catch (err: any) {
       setError(err.message || "Failed to execute audit pipeline.");
@@ -115,7 +115,7 @@ export function LiveSandbox() {
 
           {/* Supervisor Audit - Real Data */}
           <div className={`p-4 rounded-lg border space-y-3 relative overflow-hidden transition-colors ${
-            audit && audit.composite_score >= 0.8 ? "bg-[var(--green-glow)] border-[var(--green)]" : "bg-[var(--bg-surface)] border-[var(--border-active)]"
+            audit && audit.composite_score >= 8.0 ? "bg-[var(--green-glow)] border-[var(--green)]" : "bg-[var(--bg-surface)] border-[var(--border-active)]"
           }`}>
             <div className="absolute top-0 right-0 p-4 opacity-10">
               <ShieldCheck className="w-16 h-16 text-[var(--violet)]" />
@@ -129,8 +129,8 @@ export function LiveSandbox() {
                 {audit ? (
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] text-[var(--text-muted)] font-mono">Reliability Score:</span>
-                    <span className={`text-sm font-bold font-mono ${audit.composite_score >= 0.8 ? "text-[var(--green)]" : "text-[var(--amber)]"}`}>
-                      {(audit.composite_score * 100).toFixed(1)}%
+                    <span className={`text-sm font-bold font-mono ${audit.composite_score >= 8.0 ? "text-[var(--green)]" : "text-[var(--amber)]"}`}>
+                      {(audit.composite_score * 10).toFixed(1)}%
                     </span>
                   </div>
                 ) : (
@@ -149,7 +149,7 @@ export function LiveSandbox() {
                     <div key={idx} className="bg-[var(--bg-elevated)] p-3 rounded-lg border border-[var(--border-subtle)] space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] font-bold text-[var(--text-primary)] uppercase">{judge.model.split("/").pop()}</span>
-                        <span className={`text-xs font-mono font-bold ${judge.score >= 0.8 ? "text-[var(--green)]" : "text-[var(--amber)]"}`}>
+                        <span className={`text-xs font-mono font-bold ${judge.score >= 8.0 ? "text-[var(--green)]" : "text-[var(--amber)]"}`}>
                           {judge.score.toFixed(2)}
                         </span>
                       </div>
@@ -158,7 +158,7 @@ export function LiveSandbox() {
                       </p>
                       <div className="flex gap-1">
                         {[...Array(5)].map((_, i) => (
-                          <div key={i} className={`h-1 flex-1 rounded-full ${i < judge.score * 5 ? "bg-[var(--violet)]" : "bg-[var(--bg-surface)]"}`} />
+                          <div key={i} className={`h-1 flex-1 rounded-full ${i < (judge.score / 2) ? "bg-[var(--violet)]" : "bg-[var(--bg-surface)]"}`} />
                         ))}
                       </div>
                     </div>

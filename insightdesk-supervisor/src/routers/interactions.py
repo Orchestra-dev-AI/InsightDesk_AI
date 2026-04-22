@@ -185,3 +185,15 @@ async def get_interaction(
             for v in verdicts
         ],
     }
+
+
+@router.delete(
+    "/all",
+    summary="Delete all interactions and test data",
+)
+async def delete_all(session: AsyncSession = Depends(get_async_session)):
+    """Clear all interactions from the database. Useful for resetting test data."""
+    await repository.delete_all_interactions(session)
+    await session.commit()
+    return {"status": "success", "message": "All interactions and test data cleared."}
+

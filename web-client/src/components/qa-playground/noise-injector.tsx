@@ -176,13 +176,21 @@ export function NoiseInjector({ onStreamReady, className = "" }: NoiseInjectorPr
         </div>
       </div>
 
-      {/* Status */}
+      {/* Status & Stop Button */}
       {isPlaying && (
-        <div className="mt-4 flex items-center gap-2 text-xs">
-          <div className="w-2 h-2 rounded-full bg-[var(--red)] pulse-live" />
-          <span className="text-[var(--red)] font-medium">
-            Injecting: {noiseProfiles[activeProfile!].label}
-          </span>
+        <div className="mt-5 flex flex-col gap-3">
+          <div className="flex items-center gap-2 text-xs">
+            <div className="w-2 h-2 rounded-full bg-[var(--red)] pulse-live" />
+            <span className="text-[var(--red)] font-medium">
+              Injecting: {noiseProfiles[activeProfile!].label}
+            </span>
+          </div>
+          <button
+            onClick={stopNoise}
+            className="w-full py-2 rounded-lg bg-[var(--red-glow)] border border-[var(--red)] border-opacity-30 text-[var(--red)] text-xs font-bold hover:bg-[var(--red)] hover:text-white transition-all"
+          >
+            Turn Off Noise
+          </button>
         </div>
       )}
     </div>

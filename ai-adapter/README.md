@@ -1,73 +1,53 @@
-# Core Intelligence — "Mind and High-Speed Body"
+# Core Intelligence (AI Adapter) — "The Mind and High-Speed Body"
 
-**Lead**: Core AI & Systems Architect
+**Lead**: Core AI & Systems Architect  
+**Role**: Dynamic Local Model Execution & AI Workflow Engine  
 
-The central nervous system of InsightDesk AI. This microservice implements the three pillars of the 2026-tier Quality Orchestration platform:
+The **AI Adapter** (Core Intelligence) serves as the central nervous system of InsightDesk AI. This service connects the dashboard directly to any local Python worker script, allowing developers to hot-swap custom AI logic and immediately test it in a production-grade WebRTC and Reasoning environment.
 
-## Architecture
+---
 
-```
+## How It Works
+
+The AI Adapter is designed for maximum flexibility and near-zero latency by bypassing traditional REST constraints:
+
+### 1. Dynamic Local AI Loading (The Worker Pipeline)
+Instead of hardcoding a specific AI provider, this microservice uses a **Dynamic Module Loader**. 
+- The user selects a local `.py` file via the frontend.
+- The backend (`engine.py`) securely executes the file's `resolve(query)` function using `importlib`.
+- The execution returns an `AgentExecutionState` containing the final resolution, the chain-of-thought steps, and any tool calls made by the local model.
+- **Why this matters**: It allows complete decoupling of the testing platform from the model. You can test Llama, Groq, OpenAI, or local Transformers by simply pointing to a different Python script.
+
+### 2. WebRTC Voice Handshake
+- The `/voice` endpoints establish a UDP-based **WebRTC** connection directly between the user's browser and the backend server (`voice_handler.py`).
+- Audio frames are streamed at lightning speed, eliminating TCP packet queuing. 
+- It detects **barge-ins** natively, allowing users to interrupt the AI stream just like a human conversation.
+
+### 3. Self-Healing QA Maintenance
+- Instead of manually fixing broken E2E tests, the `self_healing.py` module tracks the DOM fingerprints of testing journeys.
+- If a UI element shifts or a selector breaks, the engine detects the drift, generates a new fallback, and autonomously validates the path.
+
+---
+
+## Internal Architecture
+
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │                    FastAPI Gateway (main.py)                     │
 ├──────────────┬──────────────────┬───────────────────────────────┤
 │  /reasoning  │     /voice       │         /healing              │
 ├──────────────┼──────────────────┼───────────────────────────────┤
 │  engine.py   │ voice_handler.py │      self_healing.py          │
-│  RAGless     │ WebRTC / UDP     │    Vision AI + StepIQ         │
-│  Think→Act→  │ TTFA < 300ms     │    Element Fingerprinting     │
-│  Observe     │ Barge-in AEC     │    Auto Patch + Validate      │
-├──────────────┴──────────────────┴───────────────────────────────┤
-│                  mcp_client.py — MCP Registry                   │
-│             "USB-C for Data" · JSON-RPC 2.0 · SQL + Notion      │
-├─────────────────────────────────────────────────────────────────┤
-│           shared/schemas/ — Single Source of Truth              │
-│        mcp.py · reasoning.py · voice.py · self_healing.py       │
-└─────────────────────────────────────────────────────────────────┘
+│  Dynamic     │ WebRTC / UDP     │    Vision AI + StepIQ         │
+│  Loader      │ TTFA < 300ms     │    Element Fingerprinting     │
+│  Execution   │ Barge-in AEC     │    Auto Patch + Validate      │
+└──────────────┴──────────────────┴───────────────────────────────┘
 ```
 
-## Modules
-
-| File | Role | Key Tech |
-|------|------|----------|
-| `main.py` | FastAPI app, endpoint routing, lifespan management | FastAPI, CORS |
-| `engine.py` | RAGless reasoning: Think → Act → Observe → Self-Correct | MCP tools, CoT |
-| `voice_handler.py` | WebRTC voice pipeline with barge-in detection | aiortc, UDP |
-| `self_healing.py` | Autonomous test journey repair via drift detection | Vision AI, StepIQ |
-| `mcp_client.py` | JSON-RPC 2.0 client for MCP tool/resource access | httpx, JSON-RPC |
-
-## 2026 Performance Benchmarks
-
-| Metric | Target | How |
-|--------|--------|-----|
-| **Autonomous Resolution** | 80% | RAGless reasoning + MCP tool execution |
-| **Accuracy** | 98% groundedness | Tool-grounded answers, near-zero hallucination |
-| **Voice TTFA** | < 300 ms | WebRTC over UDP, no head-of-line blocking |
-| **Voice MOS** | ≥ 4.3 / 5 | Native audio reasoning (Gemini 2.0 Flash) |
-| **QA Maintenance** | 85% reduction | Self-healing auto-patches |
-| **Throughput** | 42-50 t/s (local) | Apple M5 Pro optimized inference |
-
 ## Quick Start
-
 ```bash
-cd core-intelligence
+cd ai-adapter
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
-
-## API Endpoints
-
-### Reasoning
-- `POST /reasoning/resolve` — Submit a query for autonomous resolution
-- `POST /reasoning/tool` — Direct MCP tool invocation
-- `GET  /reasoning/tools` — List available MCP tools
-
-### Voice
-- `POST /voice/offer` — Initiate WebRTC session (SDP offer/answer)
-- `POST /voice/ice-candidate` — Add trickle ICE candidate
-- `GET  /voice/session/{id}` — Session telemetry (TTFA, MOS, jitter)
-
-### Self-Healing
-- `POST /healing/journeys` — Register a test journey
-- `GET  /healing/journeys` — List all journeys + health status
-- `POST /healing/heal` — Trigger self-healing cycle
-- `GET  /healing/stats` — Aggregate healing metrics
+*Note: The platform is designed to be started via the root `start.py` script which auto-handles port binding and dependency checks.*

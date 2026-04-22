@@ -142,6 +142,15 @@ async def get_low_quality_interactions(
     return result.scalars().all()
 
 
+async def delete_all_interactions(session: AsyncSession) -> None:
+    """Delete all interaction logs, verdicts, and RCA traces (Reset Test Data)."""
+    from sqlalchemy import delete
+    await session.execute(delete(RCATrace))
+    await session.execute(delete(JudgeVerdict))
+    await session.execute(delete(InteractionLog))
+    await session.flush()
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 #  JUDGE VERDICTS
 # ═══════════════════════════════════════════════════════════════════════════════

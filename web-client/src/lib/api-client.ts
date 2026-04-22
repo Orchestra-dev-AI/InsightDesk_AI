@@ -184,6 +184,19 @@ export const interactions = {
       `/interactions/${encodeURIComponent(sessionId)}`
     );
   },
+
+  ingest(data: AgentExecutionState) {
+    return infra<InteractionRecord>("/interactions/ingest", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  deleteAll() {
+    return infra<{ status: string }>("/interactions/all", {
+      method: "DELETE",
+    });
+  },
 };
 
 // ── Evaluation ──────────────────────────────────────────────────────────────

@@ -58,6 +58,31 @@ class SelfHealingEngine:
         self._fingerprint_store: Dict[str, ElementFingerprint] = {}
         self._healing_history: List[HealingReport] = []
 
+        # -- Preload Demo Data --
+        demo_journey = TestJourney(
+            journey_id="login-flow-auth",
+            name="User Login Flow",
+            description="Validates core authentication and 2FA token generation.",
+            target_url="/auth/login",
+            last_run_status="success",
+            is_healthy=True,
+            health_score=0.98,
+            steps=[]
+        )
+        self.register_journey(demo_journey)
+
+        demo_journey2 = TestJourney(
+            journey_id="checkout-cart",
+            name="Shopping Cart Checkout",
+            description="End-to-end checkout pipeline with Stripe integration.",
+            target_url="/checkout",
+            last_run_status="failed",
+            is_healthy=False,
+            health_score=0.45,
+            steps=[]
+        )
+        self.register_journey(demo_journey2)
+
     # ── Journey Registry ─────────────────────────────────────────────────────
 
     def register_journey(self, journey: TestJourney) -> None:
