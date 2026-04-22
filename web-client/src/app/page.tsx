@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { LiveSandbox } from "@/components/dashboard/live-sandbox";
 import { useApi } from "@/hooks/use-api";
 import * as api from "@/lib/api-client";
 import type { InteractionRecord, TrendDataPoint } from "@/lib/types/evaluation";
@@ -163,6 +164,9 @@ export default function DashboardPage() {
           icon={<Activity className="w-4 h-4" />}
         />
       </div>
+
+      {/* Live Worker Sandbox - Real-time Audit Testing */}
+      <LiveSandbox />
 
       {/* Trend Visualization + Recent Interactions */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">

@@ -38,8 +38,12 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${inter.variable} ${jetbrains.variable} dark`}
+      suppressHydrationWarning
     >
-      <body className="min-h-screen bg-[var(--background)] text-[var(--foreground)] antialiased">
+      <body 
+        className="min-h-screen bg-[var(--background)] text-[var(--foreground)] antialiased"
+        suppressHydrationWarning
+      >
         {/* Animated mesh background */}
         <div className="mesh-bg" aria-hidden="true">
           <div className="mesh-orb-3" />

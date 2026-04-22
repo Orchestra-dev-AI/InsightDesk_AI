@@ -127,6 +127,35 @@ export const healing = {
   },
 };
 
+// ── Configuration ────────────────────────────────────────────────────────────
+
+export const config = {
+  getWorkerConfig() {
+    return core<{
+      source_type: string;
+      remote_url?: string;
+      local_path?: string;
+      api_key?: string;
+    }>("/config/worker");
+  },
+
+  updateWorkerConfig(data: {
+    source_type: string;
+    remote_url?: string;
+    local_path?: string;
+    api_key?: string;
+  }) {
+    return core<{ status: string; active_source: string }>("/config/worker", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  browseLocalFile() {
+    return core<{ status: string; path?: string }>("/config/browse");
+  },
+};
+
 // ── Interactions ────────────────────────────────────────────────────────────
 
 export const interactions = {

@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Zap,
+  Settings,
 } from "lucide-react";
 
 const navItems = [
@@ -22,6 +23,7 @@ const navItems = [
   { href: "/diagnostics", label: "Diagnostics & RCA", icon: Search },
   { href: "/healing", label: "Self-Healing", icon: Heart },
   { href: "/inference", label: "Inference Hub", icon: Cpu },
+  { href: "/settings", label: "Worker Config", icon: Settings },
 ];
 
 export function Sidebar() {

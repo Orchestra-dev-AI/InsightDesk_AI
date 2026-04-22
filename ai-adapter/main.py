@@ -166,6 +166,71 @@ async def health_check():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+#  CONFIGURATION — Dynamic Worker Source
+# ══════════════════════════════════════════════════════════════════════════════
+
+class WorkerConfig(BaseModel):
+    source_type: str = Field(..., pattern="^(INTERNAL_DEMO|EXTERNAL_URL|LOCAL_FOLDER)$")
+    remote_url: Optional[str] = None
+    local_path: Optional[str] = None
+    api_key: Optional[str] = None
+
+@app.get("/config/worker", tags=["Configuration"])
+async def get_worker_config():
+    """Retrieve the current active worker source and settings."""
+    if not reasoning_engine:
+        raise HTTPException(503, "Reasoning engine not initialized")
+    return reasoning_engine.get_config()
+
+@app.post("/config/worker", tags=["Configuration"])
+async def update_worker_config(config: WorkerConfig):
+    """Update the worker source (Demo, URL, or Local Folder)."""
+    if not reasoning_engine:
+        raise HTTPException(503, "Reasoning engine not initialized")
+    reasoning_engine.update_config(
+        source_type=config.source_type,
+        remote_url=config.remote_url,
+        local_path=config.local_path,
+        api_key=config.api_key
+    )
+    return {"status": "updated", "active_source": config.source_type}
+
+@app.get("/config/browse", tags=["Configuration"])
+async def browse_local_file():
+    """Opens a native file explorer window on the host machine to select a Python file."""
+    import tkinter as tk
+    from tkinter import filedialog
+    import threading
+
+    result_path = {"path": None}
+
+    def open_dialog():
+        root = tk.Tk()
+        root.withdraw() # Hide the main tk window
+        root.attributes('-topmost', True) # Bring to front
+        file_path = filedialog.askopenfilename(
+            title="Select Local Worker AI Script",
+            filetypes=[("Python Files", "*.py"), ("All Files", "*.*")]
+        )
+        if file_path:
+            # Convert to absolute path with consistent separators
+            import os
+            result_path["path"] = os.path.abspath(file_path).replace("\\", "/")
+        root.destroy()
+
+    # Run in a separate thread because tkinter requires the main thread
+    # or its own isolated thread to not block the async loop
+    t = threading.Thread(target=open_dialog)
+    t.start()
+    t.join()
+
+    if result_path["path"]:
+        return {"status": "success", "path": result_path["path"]}
+    else:
+        return {"status": "cancelled"}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 #  REASONING ENGINE — Action-Oriented RAGless Agent
 # ══════════════════════════════════════════════════════════════════════════════
 

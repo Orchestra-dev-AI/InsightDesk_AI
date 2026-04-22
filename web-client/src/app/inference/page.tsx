@@ -170,25 +170,25 @@ export default function InferencePage() {
             </thead>
             <tbody>
               <tr className="border-b border-[var(--border-subtle)]">
-                <td className="py-2.5 font-medium text-[var(--text-primary)]">Qwen 2.5</td>
-                <td className="py-2.5 text-center font-mono text-[var(--cyan)]">32B</td>
-                <td className="py-2.5 text-center text-[var(--text-secondary)]">M5 Pro 48GB</td>
-                <td className="py-2.5 text-center font-mono text-[var(--green)]">42-50 t/s</td>
-                <td className="py-2.5 text-center text-[var(--text-muted)]">Bias detection, CoT</td>
+                <td className="py-2.5 font-medium text-[var(--text-primary)]">Llama 3.3 Instruct</td>
+                <td className="py-2.5 text-center font-mono text-[var(--violet)]">70B</td>
+                <td className="py-2.5 text-center text-[var(--text-secondary)]">NVIDIA NIM</td>
+                <td className="py-2.5 text-center font-mono text-[var(--green)]">High Logic</td>
+                <td className="py-2.5 text-center text-[var(--text-muted)]">Supervisor Judge 1 (Reasoning)</td>
               </tr>
               <tr className="border-b border-[var(--border-subtle)]">
-                <td className="py-2.5 font-medium text-[var(--text-primary)]">Llama 3.3</td>
-                <td className="py-2.5 text-center font-mono text-[var(--violet)]">70B</td>
-                <td className="py-2.5 text-center text-[var(--text-secondary)]">M5 Pro 64GB</td>
-                <td className="py-2.5 text-center font-mono text-[var(--green)]">18-24 t/s</td>
-                <td className="py-2.5 text-center text-[var(--text-muted)]">Judge Ceiling, reasoning</td>
+                <td className="py-2.5 font-medium text-[var(--text-primary)]">Qwen 2.5 Coder</td>
+                <td className="py-2.5 text-center font-mono text-[var(--cyan)]">32B</td>
+                <td className="py-2.5 text-center text-[var(--text-secondary)]">NVIDIA NIM</td>
+                <td className="py-2.5 text-center font-mono text-[var(--green)]">Specialist</td>
+                <td className="py-2.5 text-center text-[var(--text-muted)]">Supervisor Judge 2 (Audit/Code)</td>
               </tr>
               <tr>
-                <td className="py-2.5 font-medium text-[var(--text-primary)]">Gemini 2.0 Flash</td>
-                <td className="py-2.5 text-center font-mono text-[var(--amber)]">API</td>
-                <td className="py-2.5 text-center text-[var(--text-secondary)]">Cloud</td>
-                <td className="py-2.5 text-center font-mono text-[var(--green)]">~100 t/s</td>
-                <td className="py-2.5 text-center text-[var(--text-muted)]">Native audio reasoning</td>
+                <td className="py-2.5 font-medium text-[var(--text-primary)]">Internal Worker</td>
+                <td className="py-2.5 text-center font-mono text-[var(--amber)]">70B+</td>
+                <td className="py-2.5 text-center text-[var(--text-secondary)]">Groq/NVIDIA</td>
+                <td className="py-2.5 text-center font-mono text-[var(--green)]">Fast</td>
+                <td className="py-2.5 text-center text-[var(--text-muted)]">Configurable Base AI</td>
               </tr>
             </tbody>
           </table>

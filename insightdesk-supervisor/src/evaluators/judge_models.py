@@ -8,8 +8,8 @@
 #          response, ensuring objective, unbiased scoring.
 #
 # Providers:
-#   • NVIDIA NIM (Llama 3.1 70B)
-#   • Groq       (Llama 3 70B)
+#   • NVIDIA NIM (Llama 3.3 70B)
+#   • NVIDIA NIM (Qwen 2.5 Coder 32B)
 # ──────────────────────────────────────────────────────────────────────────────
 
 from __future__ import annotations
@@ -223,22 +223,22 @@ class BaseJudge(abc.ABC):
             return {"reasoning": raw, "overall_score": 5.0, "confidence": 0.1}
 
 
-# ── NVIDIA Judge ────────────────────────────────────────────────────────────
+# ── Judge 1: Llama 3.3 70B ──────────────────────────────────────────────────
 
-class NvidiaJudge(BaseJudge):
-    """Judge powered by NVIDIA NIM (Llama 3.1 70B). Uses OpenAI-compatible SDK endpoint."""
+class NvidiaLlamaJudge(BaseJudge):
+    """Judge powered by NVIDIA NIM (Llama 3.3 70B)."""
 
-    provider = "nvidia"
+    provider = "nvidia_llama"
 
     def __init__(self) -> None:
-        self.model = settings.JUDGE_NVIDIA_MODEL
-        self._api_key = settings.JUDGE_NVIDIA_API_KEY
-        self._base_url = settings.JUDGE_NVIDIA_BASE_URL
+        self.model = settings.JUDGE_1_MODEL
+        self._api_key = settings.JUDGE_1_API_KEY
+        self._base_url = settings.JUDGE_1_BASE_URL
 
     async def _call_model(self, system_prompt: str, user_prompt: str) -> str:
         if not self._api_key:
             return json.dumps({
-                "reasoning": "NVIDIA API key not configured — returning mock score.",
+                "reasoning": "Judge 1 API key not configured — returning mock score.",
                 "coherence": 7, "consistency": 7, "fluency": 8, "relevance": 7,
                 "overall_score": 7.25, "confidence": 0.3,
             })
@@ -261,22 +261,22 @@ class NvidiaJudge(BaseJudge):
             return resp.json()["choices"][0]["message"]["content"]
 
 
-# ── Groq Judge ─────────────────────────────────────────────────────────
+# ── Judge 2: Qwen 2.5 Coder 32B ──────────────────────────────────────────────
 
-class GroqJudge(BaseJudge):
-    """Judge powered by Groq (Llama 3 70B). Uses OpenAI-compatible SDK endpoint."""
+class NvidiaQwenJudge(BaseJudge):
+    """Judge powered by NVIDIA NIM (Qwen 2.5 Coder 32B)."""
 
-    provider = "groq"
+    provider = "nvidia_qwen"
 
     def __init__(self) -> None:
-        self.model = settings.JUDGE_GROQ_MODEL
-        self._api_key = settings.JUDGE_GROQ_API_KEY
-        self._base_url = settings.JUDGE_GROQ_BASE_URL
+        self.model = settings.JUDGE_2_MODEL
+        self._api_key = settings.JUDGE_2_API_KEY
+        self._base_url = settings.JUDGE_2_BASE_URL
 
     async def _call_model(self, system_prompt: str, user_prompt: str) -> str:
         if not self._api_key:
             return json.dumps({
-                "reasoning": "Groq API key not configured — returning mock score.",
+                "reasoning": "Judge 2 API key not configured — returning mock score.",
                 "coherence": 8, "consistency": 7, "fluency": 7, "relevance": 8,
                 "overall_score": 7.5, "confidence": 0.3,
             })
@@ -302,5 +302,5 @@ class GroqJudge(BaseJudge):
 # ── Factory ─────────────────────────────────────────────────────────────────
 
 def create_default_judges() -> List[BaseJudge]:
-    """Instantiate the default 2-judge panel (one per provider)."""
-    return [NvidiaJudge(), GroqJudge()]
+    """Instantiate the default 2-judge panel (Llama 3.3 and Qwen 2.5)."""
+    return [NvidiaLlamaJudge(), NvidiaQwenJudge()]

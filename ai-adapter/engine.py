@@ -67,6 +67,29 @@ class ReasoningEngine:
         self.mcp = mcp_registry
         self._episodic_memory: List[Dict[str, Any]] = []
         self.router = MultiProviderRouter()
+        
+        # ── Configuration State ──────────────────────────────────────────────
+        self.config = {
+            "source_type": os.getenv("WORKER_SOURCE", "INTERNAL_DEMO"),
+            "remote_url": None,
+            "local_path": None,
+            "api_key": None
+        }
+
+    def get_config(self) -> Dict[str, Any]:
+        """Return current configuration."""
+        return self.config
+
+    def update_config(self, source_type: str, remote_url: Optional[str] = None, 
+                      local_path: Optional[str] = None, api_key: Optional[str] = None) -> None:
+        """Update active worker source and settings."""
+        self.config.update({
+            "source_type": source_type,
+            "remote_url": remote_url,
+            "local_path": local_path,
+            "api_key": api_key
+        })
+        logger.info("Worker configuration updated to source: %s", source_type)
 
     # ── Public API ───────────────────────────────────────────────────────────
 
@@ -90,8 +113,16 @@ class ReasoningEngine:
         )
         t0 = time.perf_counter()
 
-        logger.info("Session %s — resolving: %s", session_id, query)
+        logger.info("Session %s — resolving via %s: %s", session_id, self.config["source_type"], query)
 
+        # ── Route based on Source Type ───────────────────────────────────────
+        if self.config["source_type"] == "EXTERNAL_URL":
+            return await self._call_external_api(query, state, t0)
+        
+        if self.config["source_type"] == "LOCAL_FOLDER":
+            return await self._call_local_module(query, state, t0)
+
+        # DEFAULT: INTERNAL_DEMO (The existing reasoning loop below)
         for step_idx in range(MAX_REASONING_STEPS):
             # ── THINK ────────────────────────────────────────────────────────
             thought = await self._think(state, step_idx)
@@ -409,9 +440,87 @@ class ReasoningEngine:
 
     # ── Telemetry ────────────────────────────────────────────────────────────
 
+    # ── External Worker Support ─────────────────────────────────────────────
+
+    async def _call_external_api(self, query: str, state: AgentExecutionState, t0: float) -> AgentExecutionState:
+        """Call a customer's API URL as the worker."""
+        import httpx
+        url = self.config["remote_url"]
+        if not url:
+            state.final_resolution = "ERROR: External URL source selected but no URL provided."
+            return state
+
+        logger.info("Calling external API: %s", url)
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                headers = {"Authorization": f"Bearer {self.config['api_key']}"} if self.config["api_key"] else {}
+                resp = await client.post(url, json={"query": query}, headers=headers)
+                resp.raise_for_status()
+                data = resp.json()
+                
+                state.final_resolution = data.get("resolution", data.get("answer", "No resolution found in API response."))
+                state.autonomous_resolution = True
+                
+                # Mock a single thought step to represent the API call
+                state.steps.append(ThoughtStep(
+                    step_index=0,
+                    thinking=f"Delegated query to external API: {url}",
+                    action_type=ActionType.RESPONSE,
+                    action_input={"api_response": data},
+                    confidence=0.95
+                ))
+        except Exception as e:
+            state.final_resolution = f"External API Error: {str(e)}"
+            state.autonomous_resolution = False
+
+        state.total_latency_ms = (time.perf_counter() - t0) * 1000
+        return state
+
+    async def _call_local_module(self, query: str, state: AgentExecutionState, t0: float) -> AgentExecutionState:
+        """Dynamically load and call a customer's local Python code."""
+        import importlib.util
+        path = self.config["local_path"]
+        if not path or not os.path.exists(path):
+            state.final_resolution = f"ERROR: Local path '{path}' not found."
+            return state
+
+        logger.info("Loading local module: %s", path)
+        try:
+            # 1. Load the module
+            spec = importlib.util.spec_from_file_location("custom_worker", path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+
+            # 2. Call resolve() function or Worker class
+            # We expect a function: resolve(query: str) -> str
+            if hasattr(module, "resolve"):
+                if hasattr(module.resolve, "__code__") and module.resolve.__code__.co_flags & 0x80: # async
+                    result = await module.resolve(query)
+                else:
+                    result = module.resolve(query)
+                state.final_resolution = str(result)
+            else:
+                state.final_resolution = "ERROR: Local module does not contain a 'resolve(query)' function."
+            
+            state.autonomous_resolution = True
+            state.steps.append(ThoughtStep(
+                step_index=0,
+                thinking=f"Executed local Python logic from: {path}",
+                action_type=ActionType.RESPONSE,
+                action_input={"local_path": path},
+                confidence=0.98
+            ))
+        except Exception as e:
+            state.final_resolution = f"Local Logic Error: {str(e)}"
+            state.autonomous_resolution = False
+
+        state.total_latency_ms = (time.perf_counter() - t0) * 1000
+        return state
+
     def _summarize_tool_result(self, invocation: ToolInvocation) -> str:
         """Create a concise observation string from a tool invocation."""
         if invocation.success:
             result_str = str(invocation.result or "")
             return result_str[:500] if len(result_str) > 500 else result_str
         return f"ERROR: {invocation.error}"
+

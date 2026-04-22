@@ -33,13 +33,13 @@ class Settings(BaseSettings):
     )
 
     # ── Judge Model Endpoints (JRH) ─────────────────────────────────────────
-    JUDGE_NVIDIA_API_KEY: Optional[str] = None
-    JUDGE_NVIDIA_MODEL: str = "meta/llama-3.1-70b-instruct"
-    JUDGE_NVIDIA_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
+    JUDGE_1_API_KEY: Optional[str] = Field(default=None, validation_alias="SUPERVISOR_NVIDIA_KEY_1")
+    JUDGE_1_MODEL: str = "meta/llama-3.3-70b-instruct"
+    JUDGE_1_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
 
-    JUDGE_GROQ_API_KEY: Optional[str] = None
-    JUDGE_GROQ_MODEL: str = "llama3-70b-8192"
-    JUDGE_GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
+    JUDGE_2_API_KEY: Optional[str] = Field(default=None, validation_alias="SUPERVISOR_NVIDIA_KEY_2")
+    JUDGE_2_MODEL: str = "qwen/qwen2.5-coder-32b-instruct"
+    JUDGE_2_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
 
     # ── JRH Thresholds ──────────────────────────────────────────────────────
     JRH_ENTROPY_THRESHOLD: float = Field(

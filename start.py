@@ -30,14 +30,14 @@ def clear_line():
     sys.stdout.write('\r\033[K')
 
 def print_header(msg: str):
-    print(f"\n{Colors.BOLD}{Colors.CYAN}◆ {msg} ◆{Colors.RESET}\n")
+    print(f"\n{Colors.BOLD}{Colors.CYAN}* {msg} *{Colors.RESET}\n")
 
 class Spinner:
     def __init__(self, message="Loading..."):
         self.message = message
         self.running = False
         self.spinner_thread = None
-        self.chars = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+        self.chars = "|/-\\"
 
     def spin(self):
         i = 0
@@ -58,7 +58,7 @@ class Spinner:
             self.spinner_thread.join()
         clear_line()
         if end_message:
-            icon = f"{Colors.GREEN}✔{Colors.RESET}" if success else f"{Colors.RED}✖{Colors.RESET}"
+            icon = "[OK]" if success else "[ERROR]"
             print(f"{icon} {end_message}")
 
 # ── Dependency Installation ───────────────────────────────────────────────────
@@ -83,7 +83,7 @@ def check_node():
         subprocess.run([npm_cmd, "-v"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return npm_cmd
     except (subprocess.CalledProcessError, FileNotFoundError):
-        print(f"\n{Colors.RED}✖ Node.js is missing.{Colors.RESET}")
+        print(f"\n{Colors.RED}Node.js is missing.{Colors.RESET}")
         print(f"{Colors.YELLOW}Please install Node.js from https://nodejs.org/ and restart your terminal.{Colors.RESET}\n")
         sys.exit(1)
 
@@ -105,13 +105,13 @@ def test_api_key(provider, key):
     try:
         if provider == "gemini":
             url = f"https://generativelanguage.googleapis.com/v1beta/models?key={key}"
-            req = urllib.request.Request(url)
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         elif provider == "groq":
             url = "https://api.groq.com/openai/v1/models"
-            req = urllib.request.Request(url, headers={"Authorization": f"Bearer {key}"})
+            req = urllib.request.Request(url, headers={"Authorization": f"Bearer {key}", "User-Agent": "Mozilla/5.0"})
         elif provider == "nvidia":
             url = "https://integrate.api.nvidia.com/v1/models"
-            req = urllib.request.Request(url, headers={"Authorization": f"Bearer {key}"})
+            req = urllib.request.Request(url, headers={"Authorization": f"Bearer {key}", "User-Agent": "Mozilla/5.0"})
         else:
             return True
 
@@ -128,14 +128,14 @@ def test_api_key(provider, key):
 def validate_keys(root_dir):
     print_header("Validating API Keys")
     
-    core_env = parse_env(root_dir / "core-intelligence" / ".env")
-    infra_env = parse_env(root_dir / "platform-infra" / ".env")
+    adapter_env = parse_env(root_dir / "ai-adapter" / ".env")
+    supervisor_env = parse_env(root_dir / "insightdesk-supervisor" / ".env")
     
     keys_to_test = [
-        ("Groq (Core)", "groq", core_env.get("GROQ_API_KEY")),
-        ("NVIDIA (Core)", "nvidia", core_env.get("NVIDIA_API_KEY")),
-        ("NVIDIA (Infra Judge)", "nvidia", infra_env.get("INFRA_JUDGE_NVIDIA_API_KEY")),
-        ("Groq (Infra Judge)", "groq", infra_env.get("INFRA_JUDGE_GROQ_API_KEY")),
+        ("Groq (Adapter)", "groq", adapter_env.get("GROQ_API_KEY")),
+        ("NVIDIA (Adapter)", "nvidia", adapter_env.get("NVIDIA_API_KEY")),
+        ("NVIDIA (Supervisor 1)", "nvidia", supervisor_env.get("SUPERVISOR_NVIDIA_KEY_1")),
+        ("NVIDIA (Supervisor 2)", "nvidia", supervisor_env.get("SUPERVISOR_NVIDIA_KEY_2")),
     ]
 
     all_good = True
@@ -157,11 +157,39 @@ def validate_keys(root_dir):
         print(f"{Colors.DIM}Continuing anyway in 3 seconds...{Colors.RESET}")
         time.sleep(3)
 
+# ── Service Management ────────────────────────────────────────────────────────
+
+def kill_port(port):
+    """Kills any process running on the specified port (Windows)."""
+    try:
+        if os.name == "nt":
+            output = subprocess.check_output(f"netstat -ano | findstr :{port}", shell=True).decode()
+            for line in output.strip().split("\n"):
+                if "LISTENING" in line:
+                    pid = line.strip().split()[-1]
+                    subprocess.run(f"taskkill /F /PID {pid}", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    return True
+        else:
+            # Unix-based implementation
+            result = subprocess.run(["lsof", "-t", "-i", f"tcp:{port}"], capture_output=True, text=True)
+            if result.stdout:
+                pids = result.stdout.strip().split("\n")
+                for pid in pids:
+                    os.kill(int(pid), signal.SIGKILL)
+                return True
+    except (subprocess.CalledProcessError, Exception):
+        pass
+    return False
+
 # ── Main Orchestration ────────────────────────────────────────────────────────
 def main():
     os.system('cls' if os.name == 'nt' else 'clear')
     print(f"\n{Colors.BOLD}{Colors.CYAN}   InsightDesk AI Platform{Colors.RESET}")
     print(f"{Colors.DIM}   Bootstrapping Local Environment...{Colors.RESET}\n")
+
+    # Cleanup existing processes
+    for port in [3000, 8000, 8001]:
+        kill_port(port)
 
     root_dir = Path(__file__).parent.resolve()
     
@@ -169,8 +197,8 @@ def main():
 
     print_header("Preparing Dependencies")
     # Python deps
-    run_silent([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"], root_dir / "core-intelligence", "Syncing Core Intelligence dependencies")
-    run_silent([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"], root_dir / "platform-infra", "Syncing Platform Infra dependencies")
+    run_silent([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"], root_dir / "ai-adapter", "Syncing AI Adapter dependencies")
+    run_silent([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"], root_dir / "insightdesk-supervisor", "Syncing Supervisor dependencies")
     # Node deps
     run_silent([npm_cmd, "install"], root_dir / "web-client", "Syncing Web Client dependencies")
 
@@ -186,14 +214,14 @@ def main():
         
         core_proc = subprocess.Popen(
             [sys.executable, "-m", "uvicorn", "main:app", "--reload", "--port", "8000"],
-            cwd=root_dir / "core-intelligence",
+            cwd=root_dir / "ai-adapter",
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         )
         processes.append(core_proc)
         
         infra_proc = subprocess.Popen(
             [sys.executable, "-m", "uvicorn", "main:app", "--reload", "--port", "8001"],
-            cwd=root_dir / "platform-infra",
+            cwd=root_dir / "insightdesk-supervisor",
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         )
         processes.append(infra_proc)
@@ -209,7 +237,7 @@ def main():
         time.sleep(5)
         spinner.stop(True, "All microservices online.")
         
-        print(f"\n{Colors.GREEN}● InsightDesk AI is fully operational.{Colors.RESET}")
+        print(f"\n{Colors.GREEN}InsightDesk AI is fully operational.{Colors.RESET}")
         print(f"  {Colors.BOLD}Dashboard:{Colors.RESET} http://localhost:3000")
         print(f"  {Colors.DIM}Press Ctrl+C at any time to shut down.{Colors.RESET}\n")
 
@@ -226,7 +254,7 @@ def main():
         time.sleep(1)
         for p in processes:
             if p.poll() is None: p.kill()
-        print(f"{Colors.GREEN}✔ Services safely stopped.{Colors.RESET}")
+        print(f"{Colors.GREEN}[OK] Services safely stopped.{Colors.RESET}")
         sys.exit(0)
 
 if __name__ == "__main__":
