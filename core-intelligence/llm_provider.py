@@ -56,13 +56,21 @@ class MultiProviderRouter:
         Calls the active LLM provider to generate the next ThoughtStep.
         If no API key is configured, falls back to the deterministic router.
         """
+        # Try the configured LLM provider; fall back to mock on ANY failure
+        # (revoked key, network error, rate limit, etc.)
         if self.provider == "gemini" and self.gemini_client:
-            return await self._call_gemini(system_prompt, user_context, tools, step_idx)
+            result = await self._call_gemini(system_prompt, user_context, tools, step_idx)
+            if result.confidence > 0.0:  # LLM call succeeded
+                return result
+            logger.warning("Gemini call failed — falling back to mock mode")
         elif self.provider == "groq" and self.groq_client:
-            return await self._call_groq(system_prompt, user_context, tools, step_idx)
+            result = await self._call_groq(system_prompt, user_context, tools, step_idx)
+            if result.confidence > 0.0:  # LLM call succeeded
+                return result
+            logger.warning("Groq call failed — falling back to mock mode")
         
         # Fallback to deterministic routing (Mock mode)
-        logger.debug("Using mock deterministic router for step %d", step_idx)
+        logger.info("Using mock deterministic router for step %d", step_idx)
         return mock_fallback(step_idx, tools)
 
     async def _call_gemini(self, system_prompt: str, user_context: str, tools: List[str], step_idx: int) -> ThoughtStep:
